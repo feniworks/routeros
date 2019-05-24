@@ -2,8 +2,9 @@ package routeros
 
 import (
 	"fmt"
+	"time"
 
-	"github.com/go-routeros/routeros/proto"
+	"gopkg.in/routeros.v2/proto"
 )
 
 type asyncReply struct {
@@ -18,6 +19,7 @@ func (c *Client) Run(sentence ...string) (*Reply, error) {
 
 // RunArgs sends a sentence to the RouterOS device and waits for the reply.
 func (c *Client) RunArgs(sentence []string) (*Reply, error) {
+	c.conn.SetDeadline(time.Now().Add(10 * time.Second))
 	c.w.BeginSentence()
 	for _, word := range sentence {
 		c.w.WriteWord(word)
