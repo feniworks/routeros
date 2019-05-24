@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"gopkg.in/routeros.v2/proto"
+	"github.com/feniworks/routeros/proto"
 )
 
 type asyncReply struct {
