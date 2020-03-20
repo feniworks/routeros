@@ -51,7 +51,7 @@ func Dial(address, username, password string) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newClientAndLogin(conn, address, username, password)
+	return newClientAndLogin(conn, username, password)
 }
 
 // DialTimeout acts like Dial but takes a timeout.
@@ -60,7 +60,7 @@ func DialTimeout(address, username, password string, timeout time.Duration) (*Cl
 	if err != nil {
 		return nil, err
 	}
-	return newClientAndLogin(conn, address, username, password)
+	return newClientAndLogin(conn, username, password)
 }
 
 // DialContext acts like DialTimeout but takes a context.
@@ -75,7 +75,7 @@ func DialContext(ctx context.Context, address, username, password string, timeou
 	if err != nil {
 		return nil, err
 	}
-	return newClientAndLoginWithContext(ctx, conn, address, username, password)
+	return newClientAndLoginWithContext(ctx, conn, username, password)
 }
 
 // DialTLS connects and logs in to a RouterOS device using TLS.
@@ -84,7 +84,7 @@ func DialTLS(address, username, password string, tlsConfig *tls.Config) (*Client
 	if err != nil {
 		return nil, err
 	}
-	return newClientAndLogin(conn, address, username, password)
+	return newClientAndLogin(conn, username, password)
 }
 
 // DialTLSTimeout connects and logs in to a RouterOS device using TLS with timeout.
@@ -96,10 +96,10 @@ func DialTLSTimeout(address, username, password string, tlsConfig *tls.Config, t
 	if err != nil {
 		return nil, err
 	}
-	return newClientAndLogin(conn, address, username, password)
+	return newClientAndLogin(conn, username, password)
 }
 
-func newClientAndLoginWithContext(ctx context.Context, rwc io.ReadWriteCloser, address, username, password string) (*Client, error) {
+func newClientAndLoginWithContext(ctx context.Context, rwc io.ReadWriteCloser, username, password string) (*Client, error) {
 	c, err := NewClient(rwc)
 	if ctx != nil {
 		c.useContext = true
@@ -126,8 +126,8 @@ func newClientAndLoginWithContext(ctx context.Context, rwc io.ReadWriteCloser, a
 	return c, nil
 }
 
-func newClientAndLogin(rwc io.ReadWriteCloser, address, username, password string) (*Client, error) {
-	return newClientAndLoginWithContext(nil, rwc, address, username, password)
+func newClientAndLogin(rwc io.ReadWriteCloser, username, password string) (*Client, error) {
+	return newClientAndLoginWithContext(nil, rwc, username, password)
 }
 
 // Close closes the connection to the RouterOS device.
@@ -147,14 +147,20 @@ func (c *Client) Close() {
 
 // Login runs the /login command. Dial and DialTLS call this automatically.
 func (c *Client) Login(username, password string) error {
-	r, err := c.Run("/login")
+	r, err := c.Run("/login", "=name="+username, "=password="+password)
 	if err != nil {
 		return err
 	}
 	ret, ok := r.Done.Map["ret"]
 	if !ok {
+		// Login method post-6.43 one stage, cleartext and no challenge
+		if r.Done != nil {
+			return nil
+		}
 		return errors.New("RouterOS: /login: no ret (challenge) received")
 	}
+
+	// Login method pre-6.43 two stages, challenge
 	b, err := hex.DecodeString(ret)
 	if err != nil {
 		return fmt.Errorf("RouterOS: /login: invalid ret (challenge) hex string received: %s", err)
